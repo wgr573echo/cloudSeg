@@ -61,8 +61,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    logger, final_output_dir, _ = create_logger(
-        config, args.cfg, 'test')
+    logger, final_output_dir, _ = create_logger(config, args.cfg, 'test')
 
     # logger.info(pprint.pformat(args))
     # logger.info(pprint.pformat(config))
@@ -88,15 +87,12 @@ def main():
     #     (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
     # )
     # logger.info(get_model_summary(model.cuda(), dump_input.cuda()))
-
+    # 用训练好的模型覆盖预训练参数
     if config.TEST.MODEL_FILE:
         model_state_file = config.TEST.MODEL_FILE
     else:
-        #model_state_file = os.path.join(final_output_dir,#fs2,fs3
-        #                                'fs3.pth')#'final_state.pth')MeanIU:  0.8391, Pixel_Acc:  0.9125,Mean_Acc:  0.9149, Class IoU:
-                                                    #[0.83728078 0.84086198]
-        model_state_file = "./output/remote/seg_hrnet_forest/fs3.pth"
-    logger.info('pretrain {}'.format(model_state_file))
+        model_state_file = ""
+    logger.info('***test model pth***{}'.format(model_state_file))
         
     pretrained_dict = torch.load(model_state_file)
     model_dict = model.state_dict()
@@ -117,7 +113,7 @@ def main():
                         list_path=config.DATASET.TEST_SET,
                         num_samples=None,
                         num_classes=config.DATASET.NUM_CLASSES,
-                        multi_scale=False,#############################
+                        multi_scale=False,
                         flip=False,
                         ignore_label=config.TRAIN.IGNORE_LABEL,
                         base_size=config.TEST.BASE_SIZE,

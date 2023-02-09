@@ -38,9 +38,8 @@ from lib.utils.modelsummary import get_model_summary
 from lib.utils.utils import create_logger, FullModel, get_rank
 from data import ImageFolder
 
-from visual_loss import Visualizer
 from torchnet import meter
-#from manager_torch import GPUManager
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Train segmentation network')
     
@@ -65,9 +64,6 @@ def main():
 
     logger, final_output_dir, tb_log_dir = create_logger(config, args.cfg, 'train')
 
-    # logger.info(pprint.pformat(args))
-    # logger.info(config)
-
     writer_dict = {
         'writer': SummaryWriter(tb_log_dir),
         'train_global_steps': 0,
@@ -79,23 +75,18 @@ def main():
     cudnn.deterministic = config.CUDNN.DETERMINISTIC
     cudnn.enabled = config.CUDNN.ENABLED
 
-    #gm = GPUManager()
-    #torch.cuda.set_device(gm.auto_choice())
-
     gpus = list(config.GPUS)
-    #gpus = list(gm.auto_choice())
     distributed = len(gpus) > 1
     device = torch.device('cuda:{}'.format(args.local_rank))
 
     # build model
-    # model = eval('models.'+config.MODEL.NAME +'.get_seg_model')(config) #'models.seg_hrnet.get_seg_model'模型
     model = get_seg_model(config)
     if args.local_rank == 0:
         # provide the summary of model
-        dump_input = torch.rand(
-            (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
-            )
-        logger.info(get_model_summary(model.to(device), dump_input.to(device)))
+        # dump_input = torch.rand(
+        #     (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
+        #     )
+        # logger.info(get_model_summary(model.to(device), dump_input.to(device)))
 
         # copy model file
         this_dir = os.path.dirname(__file__)
@@ -112,20 +103,9 @@ def main():
 
     # prepare data
     crop_size = (config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
-    # train_dataset = eval('datasets.'+'remote')(#config.DATASET.DATASET
-    #                     root=config.DATASET.ROOT,
-    #                     list_path=config.DATASET.TRAIN_SET,
-    #                     num_samples=None,
-    #                     num_classes=config.DATASET.NUM_CLASSES,
-    #                     multi_scale=config.TRAIN.MULTI_SCALE,
-    #                     flip=config.TRAIN.FLIP,
-    #                     ignore_label=config.TRAIN.IGNORE_LABEL,
-    #                     base_size=config.TRAIN.BASE_SIZE,
-    #                     crop_size=crop_size,
-    #                     downsample_rate=config.TRAIN.DOWNSAMPLERATE,
-    #                     scale_factor=config.TRAIN.SCALE_FACTOR)
+    
     train_dataset = remote(root=config.DATASET.ROOT,
-                        list_path=config.DATASET.TRAIN_SET,
+                        list_path=config.DATASET.TRAIN_SET,#训练list
                         num_samples=None,
                         num_classes=config.DATASET.NUM_CLASSES,
                         multi_scale=config.TRAIN.MULTI_SCALE,
@@ -151,8 +131,7 @@ def main():
         sampler=train_sampler)
 
     test_size = (config.TEST.IMAGE_SIZE[1], config.TEST.IMAGE_SIZE[0])
-    test_dataset = eval('datasets.'+config.DATASET.DATASET)(
-                        root=config.DATASET.ROOT,
+    test_dataset = remote(root=config.DATASET.ROOT,
                         list_path=config.DATASET.TEST_SET,
                         num_samples=config.TEST.NUM_SAMPLES,
                         num_classes=config.DATASET.NUM_CLASSES,
@@ -215,8 +194,7 @@ def main():
         model_state_file = os.path.join(final_output_dir,
                                         'checkpoint.pth.tar')
         if os.path.isfile(model_state_file):
-            checkpoint = torch.load(model_state_file, 
-                        map_location=lambda storage, loc: storage)
+            checkpoint = torch.load(model_state_file, map_location=lambda storage, loc: storage)
             best_mIoU = checkpoint['best_mIoU']
             last_epoch = checkpoint['epoch']
             model.model.load_state_dict(checkpoint['state_dict'])#module
@@ -230,7 +208,6 @@ def main():
     extra_iters = config.TRAIN.EXTRA_EPOCH * epoch_iters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    vis = Visualizer(env='main')
     loss_meter = meter.AverageValueMeter()
     miou_meter = meter.AverageValueMeter()
 
