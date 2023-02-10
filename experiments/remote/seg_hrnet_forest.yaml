@@ -12,11 +12,12 @@ DATASET:
   DATASET: remote
   ROOT: 'data/'
   TEST_SET: 'list/remote/forest/val.lst'
-  TRAIN_SET: 'list/remote/forest/train_L7_ch1.lst'
+  TRAIN_SET: 'list/remote/forest/val.lst'
   NUM_CLASSES: 2
+
 MODEL:
   NAME: seg_hrnet
-  PRETRAINED: 'pretrained_models/final_state2.pth.pth'  # final_state2.pth hrnetv2_w48_imagenet_pretrained.pth'
+  PRETRAINED: './output/remote/seg_hrnet_forest/fs3.pth'  #seg_hrnet函数里面初始化参数的路径
   EXTRA:
     FINAL_CONV_KERNEL: 1
     STAGE1:
@@ -73,14 +74,14 @@ LOSS:
   OHEMKEEP: 131072
 TRAIN:
   IMAGE_SIZE:
-  - 512 #1024
-  - 512 #512
-  BASE_SIZE: 1024 # 512 #2048
+  - 1200 #1024
+  - 1200 #512
+  BASE_SIZE: 1024 
   BATCH_SIZE_PER_GPU: 4
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 200 #484
-  RESUME: true
+  RESUME: false
   OPTIMIZER: sgd
   LR: 0.01
   WD: 0.0005
@@ -89,13 +90,14 @@ TRAIN:
   FLIP: true
   MULTI_SCALE: true
   DOWNSAMPLERATE: 1
-  IGNORE_LABEL: 255
+  IGNORE_LABEL: -1
   SCALE_FACTOR: 16
 TEST:
   IMAGE_SIZE:
   - 1200 #2048
   - 1200 #1024
-  BASE_SIZE: 1200 #512 #2048 图像大小
+  BASE_SIZE: 1200 #输入图像大小
   BATCH_SIZE_PER_GPU: 4
   FLIP_TEST: false
   MULTI_SCALE: false
+  MODEL_FILE: './output/remote/seg_hrnet_forest/fs3.pth' #外部更新初始化参数
