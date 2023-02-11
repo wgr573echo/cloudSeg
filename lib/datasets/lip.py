@@ -107,13 +107,13 @@ class LIP(BaseDataset):
     def inference(self, model, image, flip):
         size = image.size()
         pred = model(image)
-        pred = F.upsample(input=pred, 
+        pred = F.interpolate(input=pred, 
                           size=(size[-2], size[-1]), 
                           mode='bilinear')        
         if flip:
             flip_img = image.numpy()[:,:,:,::-1]
             flip_output = model(torch.from_numpy(flip_img.copy()))
-            flip_output = F.upsample(input=flip_output, 
+            flip_output = F.interpolate(input=flip_output, 
                             size=(size[-2], size[-1]), 
                             mode='bilinear')
             flip_output = flip_output.cpu().numpy()

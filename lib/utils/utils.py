@@ -142,24 +142,26 @@ def get_confusion_matrix(label, pred, size, num_class, ignore=-1):
     """
     Calcute the confusion matrix by given label and pred
     """
-    output = pred.cpu().numpy().transpose(0, 2, 3, 1)
-    seg_pred = np.asarray(np.argmax(output, axis=3), dtype=np.uint8)
+    output = pred.cpu().numpy().transpose(0, 2, 3, 1) #batch*图像尺寸*2个类的置信度：1，1200，1200，2
+    seg_pred = np.asarray(np.argmax(output, axis=3), dtype=np.uint8)#1，1200，1200
     seg_gt = np.asarray(label.cpu().numpy()[:, :size[-2], :size[-1]], dtype=np.int)
 
     ignore_index = seg_gt != ignore
     seg_gt = seg_gt[ignore_index]
-    seg_pred = seg_pred[ignore_index]
+    seg_pred = seg_pred[ignore_index]#预测：真值1、背景0
 
-    index = (seg_gt * num_class + seg_pred).astype('int32')
-    label_count = np.bincount(index)
+    tmp = seg_gt * num_class #真值：前景2、背景0
+    index = (tmp + seg_pred).astype('int32')
+    #[同为0，预测为1但是真值为0，预测为0但是真值为1*classnum，同预测为1]
+    label_count = np.bincount(index) #bincount(X):每个bin给出了它的索引值在x中出现的次数
     confusion_matrix = np.zeros((num_class, num_class))
 
     for i_label in range(num_class):
         for i_pred in range(num_class):
             cur_index = i_label * num_class + i_pred
             if cur_index < len(label_count):
-                confusion_matrix[i_label,
-                                 i_pred] = label_count[cur_index]
+                confusion_matrix[i_label,i_pred] = label_count[cur_index]
+                
     return confusion_matrix
 
 def adjust_learning_rate(optimizer, base_lr, max_iters, 

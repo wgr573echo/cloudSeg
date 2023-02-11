@@ -114,8 +114,8 @@ class BaseDataset(data.Dataset):
             image = self.image_resize(image, long_size)
             return image
 
-    def gen_sample(self, image, label, 
-            multi_scale=True, is_flip=True, center_crop_test=False):
+    def gen_sample(self, image, label, multi_scale=True, is_flip=True, center_crop_test=False):
+        
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             image, label = self.multi_scale_aug(image, label, 
@@ -128,6 +128,7 @@ class BaseDataset(data.Dataset):
             image, label = self.center_crop(image, label)
 
         image = self.input_transform(image)
+        # 去除非0和1的标签（float转int，0.745向下取为0）
         label = self.label_transform(label)
         
         image = image.transpose((2, 0, 1))
@@ -149,81 +150,81 @@ class BaseDataset(data.Dataset):
     def inference(self, model, image, flip=False):
         size = image.size()
         pred = model(image)
-        pred = F.upsample(input=pred, 
+        pred = F.interpolate(input=pred, 
                             size=(size[-2], size[-1]), 
                             mode='bilinear')        
         if flip:
             flip_img = image.numpy()[:,:,:,::-1]
             flip_output = model(torch.from_numpy(flip_img.copy()))
-            flip_output = F.upsample(input=flip_output, 
+            flip_output = F.interpolate(input=flip_output, 
                             size=(size[-2], size[-1]), 
                             mode='bilinear')
             flip_pred = flip_output.cpu().numpy().copy()
             flip_pred = torch.from_numpy(flip_pred[:,:,:,::-1].copy()).cuda()
             pred += flip_pred
             pred = pred * 0.5
-        return pred.exp()
+        return pred.exp() #exp返回e的pred次指数
 
-    def multi_scale_inference(self, model, image, scales=[1], flip=False):
-        batch, _, ori_height, ori_width = image.size()
-        assert batch == 1, "only supporting batchsize 1."
-        device = torch.device("cuda:%d" % model.device_ids[0])
-        image = image.numpy()[0].transpose((1,2,0)).copy()
-        stride_h = np.int(self.crop_size[0] * 2.0 / 3.0)
-        stride_w = np.int(self.crop_size[1] * 2.0 / 3.0)
-        final_pred = torch.zeros([1, self.num_classes,
-                                    ori_height,ori_width]).to(device)
-        padvalue = -1.0  * np.array(self.mean) / np.array(self.std)
-        for scale in scales:
-            new_img = self.multi_scale_aug(image=image,
-                                           rand_scale=scale,
-                                           rand_crop=False)
-            height, width = new_img.shape[:-1]
+    # def multi_scale_inference(self, model, image, scales=[1], flip=False):
+    #     batch, _, ori_height, ori_width = image.size()
+    #     assert batch == 1, "only supporting batchsize 1."
+    #     device = torch.device("cuda:%d" % model.device_ids[0])
+    #     image = image.numpy()[0].transpose((1,2,0)).copy()
+    #     stride_h = np.int(self.crop_size[0] * 2.0 / 3.0)
+    #     stride_w = np.int(self.crop_size[1] * 2.0 / 3.0)
+    #     final_pred = torch.zeros([1, self.num_classes,
+    #                                 ori_height,ori_width]).to(device)
+    #     padvalue = -1.0  * np.array(self.mean) / np.array(self.std)
+    #     for scale in scales:
+    #         new_img = self.multi_scale_aug(image=image,
+    #                                        rand_scale=scale,
+    #                                        rand_crop=False)
+    #         height, width = new_img.shape[:-1]
                 
-            if max(height, width) <= np.min(self.crop_size):
-                new_img = self.pad_image(new_img, height, width, 
-                                    self.crop_size, padvalue)
-                new_img = new_img.transpose((2, 0, 1))
-                new_img = np.expand_dims(new_img, axis=0)
-                new_img = torch.from_numpy(new_img)
-                preds = self.inference(model, new_img, flip)
-                preds = preds[:, :, 0:height, 0:width]
-            else:
-                if height < self.crop_size[0] or width < self.crop_size[1]:
-                    new_img = self.pad_image(new_img, height, width, 
-                                        self.crop_size, padvalue)
-                new_h, new_w = new_img.shape[:-1]
-                rows = np.int(np.ceil(1.0 * (new_h - 
-                                self.crop_size[0]) / stride_h)) + 1
-                cols = np.int(np.ceil(1.0 * (new_w - 
-                                self.crop_size[1]) / stride_w)) + 1
-                preds = torch.zeros([1, self.num_classes,
-                                           new_h,new_w]).to(device)
-                count = torch.zeros([1,1, new_h, new_w]).to(device)
+    #         if max(height, width) <= np.min(self.crop_size):
+    #             new_img = self.pad_image(new_img, height, width, 
+    #                                 self.crop_size, padvalue)
+    #             new_img = new_img.transpose((2, 0, 1))
+    #             new_img = np.expand_dims(new_img, axis=0)
+    #             new_img = torch.from_numpy(new_img)
+    #             preds = self.inference(model, new_img, flip)
+    #             preds = preds[:, :, 0:height, 0:width]
+    #         else:
+    #             if height < self.crop_size[0] or width < self.crop_size[1]:
+    #                 new_img = self.pad_image(new_img, height, width, 
+    #                                     self.crop_size, padvalue)
+    #             new_h, new_w = new_img.shape[:-1]
+    #             rows = np.int(np.ceil(1.0 * (new_h - 
+    #                             self.crop_size[0]) / stride_h)) + 1
+    #             cols = np.int(np.ceil(1.0 * (new_w - 
+    #                             self.crop_size[1]) / stride_w)) + 1
+    #             preds = torch.zeros([1, self.num_classes,
+    #                                        new_h,new_w]).to(device)
+    #             count = torch.zeros([1,1, new_h, new_w]).to(device)
 
-                for r in range(rows):
-                    for c in range(cols):
-                        h0 = r * stride_h
-                        w0 = c * stride_w
-                        h1 = min(h0 + self.crop_size[0], new_h)
-                        w1 = min(w0 + self.crop_size[1], new_w)
-                        crop_img = new_img[h0:h1, w0:w1, :]
-                        if h1 == new_h or w1 == new_w:
-                            crop_img = self.pad_image(crop_img, 
-                                                      h1-h0, 
-                                                      w1-w0, 
-                                                      self.crop_size, 
-                                                      padvalue)
-                        crop_img = crop_img.transpose((2, 0, 1))
-                        crop_img = np.expand_dims(crop_img, axis=0)
-                        crop_img = torch.from_numpy(crop_img)
-                        pred = self.inference(model, crop_img, flip)
+    #             for r in range(rows):
+    #                 for c in range(cols):
+    #                     h0 = r * stride_h
+    #                     w0 = c * stride_w
+    #                     h1 = min(h0 + self.crop_size[0], new_h)
+    #                     w1 = min(w0 + self.crop_size[1], new_w)
+    #                     crop_img = new_img[h0:h1, w0:w1, :]
+    #                     if h1 == new_h or w1 == new_w:
+    #                         crop_img = self.pad_image(crop_img, 
+    #                                                   h1-h0, 
+    #                                                   w1-w0, 
+    #                                                   self.crop_size, 
+    #                                                   padvalue)
+    #                     crop_img = crop_img.transpose((2, 0, 1))
+    #                     crop_img = np.expand_dims(crop_img, axis=0)
+    #                     crop_img = torch.from_numpy(crop_img)
+    #                     pred = self.inference(model, crop_img, flip)
 
-                        preds[:,:,h0:h1,w0:w1] += pred[:,:, 0:h1-h0, 0:w1-w0]
-                        count[:,:,h0:h1,w0:w1] += 1
-                preds = preds / count
-                preds = preds[:,:,:height,:width]
-            preds = F.upsample(preds, (ori_height, ori_width), 
-                                   mode='bilinear')
-            final_pred += preds
-        return final_pred
+    #                     preds[:,:,h0:h1,w0:w1] += pred[:,:, 0:h1-h0, 0:w1-w0]
+    #                     count[:,:,h0:h1,w0:w1] += 1
+    #             preds = preds / count
+    #             preds = preds[:,:,:height,:width]
+    #         preds = F.interpolate(preds, (ori_height, ori_width), 
+    #                                mode='bilinear')
+    #         final_pred += preds
+    #     return final_pred

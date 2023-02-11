@@ -43,6 +43,12 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
     
     # Training
     model.train()
+
+    # for name, param in model.named_parameters():
+    #             if param.requires_grad:
+    #                 print(name)
+    # print("除了最后一层其他都冻结")
+
     batch_time = AverageMeter()
     ave_loss = AverageMeter()
     tic = time.time()
@@ -51,14 +57,23 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
     global_steps = writer_dict['train_global_steps']
     rank = get_rank()
     world_size = get_world_size()
-    vis2 = Visualizer(env='main')
+
     loss1_meter = meter.AverageValueMeter()
-    #miou1_meter = meter.AverageValueMeter()
+    miou1_meter = meter.AverageValueMeter()
 
     for i_iter, batch in enumerate(trainloader):
         images, labels, _, _ = batch
         images = images.to(device)
         labels = labels.long().to(device)
+
+        # #-----------#
+        # import matplotlib.pyplot as plt
+        # arrayImg = images.cpu()
+        # arrayImg = np.transpose(arrayImg[0],(1,2,0))
+        # arraylabel = labels.cpu().numpy()
+        # plt.imshow(arrayImg)	#show image
+        # plt.imshow(arraylabel[0])
+        # #-----------#
 
         losses, _ = model(images, labels)
         loss = losses.mean()
@@ -90,7 +105,6 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
             logging.info(msg)
             loss1_meter.reset()
             loss1_meter.add(print_loss)
-            vis2.plot_many_stack({'train_loss':loss1_meter.value()[0]})
             
             writer.add_scalar('train_loss', print_loss, global_steps)
             writer_dict['train_global_steps'] = global_steps + 1
@@ -112,7 +126,7 @@ def validate(config, testloader, model, writer_dict, device):
             label = label.long().to(device)
 
             losses, pred = model(image, label)
-            pred = F.upsample(input=pred, size=(
+            pred = F.interpolate(input=pred, size=(
                         size[-2], size[-1]), mode='bilinear')
             loss = losses.mean()
             reduced_loss = reduce_tensor(loss)
@@ -155,17 +169,16 @@ def testval(config, test_dataset, testloader, model,
             image, label, _, name = batch
             size = label.size()
             
-            #-----------#
+            # #-----------#
             # import matplotlib.pyplot as plt
-            # arrayImg = image.numpy()	#transfer tensor to array
-            # arrayImg = np.transpose(arrayImg[0],(1,2,0))
+            # # arrayImg = image.numpy()	#transfer tensor to array
+            # # arrayImg = np.transpose(arrayImg[0],(1,2,0))
             # arraylabel = label.numpy()
             # # plt.imshow(arrayImg)	#show image
             # plt.imshow(arraylabel[0])
-            # print(arraylabel.__contains__(1))
-            #-----------#
-            
-            
+            # # print(arraylabel.__contains__(1))
+            # # print(arraylabel.__contains__(0.745))
+            # #-----------#
             
             pred = test_dataset.multi_scale_inference(
                         model, 
@@ -173,8 +186,9 @@ def testval(config, test_dataset, testloader, model,
                         scales=config.TEST.SCALE_LIST, 
                         flip=config.TEST.FLIP_TEST)
             
+            # 标签和预测图像尺寸统一
             if pred.size()[-2] != size[-2] or pred.size()[-1] != size[-1]:
-                pred = F.upsample(pred, (size[-2], size[-1]), 
+                pred = F.interpolate(pred, (size[-2], size[-1]), 
                                    mode='bilinear')
 
             confusion_matrix += get_confusion_matrix(
@@ -199,9 +213,9 @@ def testval(config, test_dataset, testloader, model,
             #     mean_IoU = IoU_array.mean()
             #     logging.info('mIoU: %.4f' % (mean_IoU))
 
-    pos = confusion_matrix.sum(1)
-    res = confusion_matrix.sum(0)
-    tp = np.diag(confusion_matrix)
+    pos = confusion_matrix.sum(1) #sum(1)求数组每一行的和，真值为1的元素数量
+    res = confusion_matrix.sum(0) #sum(0)求数组每一列的和，预测为1的元素数量
+    tp = np.diag(confusion_matrix) #np.diag：取对角线元素
     pixel_acc = tp.sum()/pos.sum()
     mean_acc = (tp/np.maximum(1.0, pos)).mean()
     IoU_array = (tp / np.maximum(1.0, pos + res - tp))
@@ -223,7 +237,7 @@ def test(config, test_dataset, testloader, model,
                         flip=config.TEST.FLIP_TEST)
             
             '''if pred.size()[-2] != size[0] or pred.size()[-1] != size[1]:
-                pred = F.upsample(pred, (size[-2], size[-1]), 
+                pred = F.interpolate(pred, (size[-2], size[-1]), 
                                    mode='bilinear')'''
 
             if sv_pred:
@@ -232,4 +246,4 @@ def test(config, test_dataset, testloader, model,
                 if not os.path.exists(sv_path):
                     os.mkdir(sv_path)
                 test_dataset.save_pred(pred, sv_path, name)
-   # print('\n'sv_path)
+

@@ -277,7 +277,7 @@ class HighResolutionModule(nn.Module):
                     y = y + F.interpolate(
                         self.fuse_layers[i][j](x[j]),
                         size=[height_output, width_output],
-                        mode='bilinear')#####上采样，在pytorch0.4.1后可替代为nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+                        mode='bilinear')#####上采样，在pytorch0.4.1后可替代为nn.interpolate(scale_factor=2, mode='bilinear', align_corners=False),
                 else:##### i<j 
                     y = y + self.fuse_layers[i][j](x[j])
             x_fuse.append(self.relu(y))
@@ -380,7 +380,6 @@ class HighResolutionNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-
     def _make_transition_layer(
             self, num_channels_pre_layer, num_channels_cur_layer):##### 过渡层
         num_branches_cur = len(num_channels_cur_layer)
@@ -416,7 +415,6 @@ class HighResolutionNet(nn.Module):
                 transition_layers.append(nn.Sequential(*conv3x3s))
 
         return nn.ModuleList(transition_layers)
-
     
     def _make_stage(self, layer_config, num_inchannels,
                     multi_scale_output=True):
@@ -484,9 +482,9 @@ class HighResolutionNet(nn.Module):
 
         # Upsampling
         x0_h, x0_w = x[0].size(2), x[0].size(3)
-        x1 = F.upsample(x[1], size=(x0_h, x0_w), mode='bilinear')
-        x2 = F.upsample(x[2], size=(x0_h, x0_w), mode='bilinear')
-        x3 = F.upsample(x[3], size=(x0_h, x0_w), mode='bilinear')
+        x1 = F.interpolate(x[1], size=(x0_h, x0_w), mode='bilinear')
+        x2 = F.interpolate(x[2], size=(x0_h, x0_w), mode='bilinear')
+        x3 = F.interpolate(x[3], size=(x0_h, x0_w), mode='bilinear')
 
         x = torch.cat([x[0], x1, x2, x3], 1)
 
@@ -504,18 +502,29 @@ class HighResolutionNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
         if os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)
-            logger.info('=> loading pretrained model {}'.format(pretrained))
+            logger.info('train stage pretrain model: {}'.format(pretrained))
             model_dict = self.state_dict()
             pretrained_dict = {k: v for k, v in pretrained_dict.items()
                                if k in model_dict.keys()}
-            for k, _ in pretrained_dict.items():
-               logger.info(
-                   '=> loading {} pretrained model {}'.format(k, pretrained))
+            # for k, _ in pretrained_dict.items():
+            #    logger.info('=> loading {} pretrained model {}'.format(k, pretrained))
             model_dict.update(pretrained_dict)
             self.load_state_dict(model_dict)
+
+            # 冻结除了last_layer之外的参数
+            
+            # model_dict = self.state_dict()
+            # dict_name = list(model_dict)
+            # for i, p in enumerate(dict_name):
+            #     print(i, p)
+
+            for i,p in enumerate(self.parameters()):
+                if i < 915:
+                    p.requires_grad = False
+
+            
 
 def get_seg_model(cfg, **kwargs):
     model = HighResolutionNet(cfg, **kwargs)
     model.init_weights(cfg.MODEL.PRETRAINED)
-
     return model

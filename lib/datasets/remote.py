@@ -47,7 +47,6 @@ class Remote(BaseDataset):
         self.center_crop_test = center_crop_test
         
         self.img_list = [line.strip().split() for line in open('./'+root+list_path)]
-        # self.img_list = [line.strip().split() for line in open("./data/list/remote/forest/test2.lst", encoding='utf-8')]
 
         self.files = self.read_files()
         if num_samples:
@@ -71,6 +70,7 @@ class Remote(BaseDataset):
                 if item != []:
                     image_path, label_path = item
                     # name = os.path.splitext(os.path.basename(label_path[0]))[0]
+
                     # WHU
                     name = os.path.splitext(os.path.basename(label_path))[0]
                     files.append({
@@ -94,7 +94,6 @@ class Remote(BaseDataset):
     def __getitem__(self, index):
         item = self.files[index]
         name = item["name"]
-        # image = cv2.imread(os.path.join('./',self.root,'remote',item["img"]),cv2.IMREAD_COLOR)
         image = cv2.imread(item["img"],cv2.IMREAD_COLOR)
         size = image.shape
 
@@ -104,22 +103,11 @@ class Remote(BaseDataset):
 
             return image.copy(), np.array(size), name
 
-        # label = cv2.imread(os.path.join('./',self.root,'remote',item["label"]),cv2.IMREAD_GRAYSCALE)
         label = cv2.imread((item["label"]),cv2.IMREAD_GRAYSCALE)
-        
-        # WHU去除非0和255的标签
-
-
-        # #-----------#
-        # import matplotlib.pyplot as plt
-        # arraylabel = label
-        # plt.imshow(arraylabel)
-        # #-----------#
-        
-        label = label/255
+        # label = label/255 #whu归一化
+        label = label/38 #th归一化
         label = self.convert_label(label)
-        
-
+                
         image, label = self.gen_sample(image, label, 
                                 self.multi_scale, self.flip, 
                                 self.center_crop_test)
@@ -174,14 +162,11 @@ class Remote(BaseDataset):
                         count[:,:,h0:h1,w0:w1] += 1
                 preds = preds / count
                 preds = preds[:,:,:height,:width]
-            preds = F.upsample(preds, (ori_height, ori_width), 
+            preds = F.interpolate(preds, (ori_height, ori_width), 
                                    mode='bilinear')
             final_pred += preds
         return final_pred
 
-    
-    
-        
 
     def get_palette(self, n):
         palette = [0] * (n * 3)
@@ -198,16 +183,6 @@ class Remote(BaseDataset):
                 i += 1
                 lab >>= 3
         return palette
-
-    # def save_pred(self, preds, sv_path, name):
-    #     palette = self.get_palette(256)
-    #     preds = preds.cpu().numpy().copy()
-    #     preds = np.asarray(np.argmax(preds, axis=1), dtype=np.uint8)
-    #     for i in range(preds.shape[0]):
-    #         pred = self.convert_label(preds[i], inverse=True)
-    #         save_img = Image.fromarray(pred)
-    #         save_img.putpalette(palette)
-    #         save_img.save(os.path.join(sv_path, name[i]+'.png'))
  
     def save_pred(self, preds, sv_path, name):
         palette = self.get_palette(256)
@@ -218,7 +193,6 @@ class Remote(BaseDataset):
             save_img = Image.fromarray(pred*255)
             # save_img.putpalette(palette)
             save_img.save(os.path.join(sv_path, name[i]+'.png'))
-            # save_img.save('output/remote/seg_hrnet_forest/test_results/'+ name[i] +'.png')
 
         
         

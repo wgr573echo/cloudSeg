@@ -226,8 +226,7 @@ def main():
                   trainloader, optimizer, model, writer_dict,device)#,device
                   
 
-        valid_loss, mean_IoU, IoU_array = validate(config, 
-                    testloader, model, writer_dict,device)#, device
+        valid_loss, mean_IoU, IoU_array = validate(config, testloader, model, writer_dict, device)
 
         if args.local_rank == 0:
             logger.info('=> saving checkpoint to {}'.format(
@@ -242,7 +241,7 @@ def main():
             if mean_IoU > best_mIoU:
                 best_mIoU = mean_IoU
                 torch.save(model.model.state_dict(),#module
-                           os.path.join(final_output_dir, 'best4.pth'))##################
+                           os.path.join(final_output_dir, 'best5.pth'))##################
             msg = 'Loss: {:.3f}, MeanIU: {: 4.4f}, Best_mIoU: {: 4.4f}'.format(
                     valid_loss, mean_IoU, best_mIoU)
 
@@ -250,14 +249,13 @@ def main():
             loss_meter.add(valid_loss)
             miou_meter.reset()
             miou_meter.add(mean_IoU)
-            vis.plot_many_stack({'valid_loss':loss_meter.value()[0],'mIoU':miou_meter.value()[0]})
 
             logging.info(msg)
             logging.info(IoU_array)
 
             if epoch == end_epoch - 1:
                 torch.save(model.model.state_dict(),#model
-                       os.path.join(final_output_dir, 'final_state4.pth'))###############
+                       os.path.join(final_output_dir, 'final_state5.pth'))###############
 
                 writer_dict['writer'].close()
                 end = timeit.default_timer()
